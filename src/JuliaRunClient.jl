@@ -1,5 +1,6 @@
 module JuliaRunClient
 
+using Compat
 using Requests
 using HttpCommon
 using JSON
@@ -7,7 +8,7 @@ using JSON
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ
 export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob
 
-abstract JRunClientJob
+@compat abstract type JRunClientJob end
 
 for T in (:JuliaParBatch, :JuliaParBatchWorkers, :Notebook, :JuliaBatch, :PkgBuilder, :Webserver, :MessageQ)
     @eval begin
