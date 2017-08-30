@@ -8,7 +8,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self, waitForWorkers
 
 @compat abstract type JRunClientJob end
 
