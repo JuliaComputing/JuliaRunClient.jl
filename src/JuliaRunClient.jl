@@ -6,15 +6,29 @@ using HttpCommon
 using JSON
 
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, self
 
 @compat abstract type JRunClientJob end
+
+const JOBTYPE_LABELS = Vector{String}()
+const JOBTYPE = Vector{Any}()
+
+as_label{T<:JRunClientJob}(::Type{T}) = String(rsplit(string(T), '.'; limit=2)[end])
+
+function self()
+    jtype = ENV["JRUN_TYPE"]
+    jname = ENV["JRUN_NAME"]
+    jultype = JOBTYPE[findfirst(JOBTYPE_LABELS, jtype)]
+    jultype(jname)
+end
 
 for T in (:JuliaParBatch, :JuliaParBatchWorkers, :Notebook, :JuliaBatch, :PkgBuilder, :Webserver, :MessageQ, :Generic)
     @eval begin
         immutable $T <: JRunClientJob
             name::String
         end
+        push!(JOBTYPE, $T)
+        push!(JOBTYPE_LABELS, as_label($T))
     end
 end
 
@@ -191,14 +205,14 @@ end
 
 function parse_resp(resp)
     (200 <= statuscode(resp) <= 206) || throw(ApiException(resp))
-    info("response ", String(resp.data))
+    #info("response ", String(resp.data))
     JSON.parse(String(resp.data))
 end
 
 function _simple_query(ctx, path)
     query = make_query(ctx)
-    info("requesting ", ctx.root * path)
-    info("query ", query)
+    #info("requesting ", ctx.root * path)
+    #info("query ", query)
     #resp = get(ctx.root * path, query=query)
     resp = get(ctx.root * path)
     parse_resp(resp)
