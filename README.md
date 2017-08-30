@@ -44,6 +44,9 @@ List all submitted jobs.
 Returns:
 - dictionary: of the form `{"jobname": { "type": "JuliaBatch", "status": [], "scale": [], "endpoint": [] }...}`
 
+### `self()`
+Returns the current Job.
+
 ### `getJobStatus(ctx, job)`
 Fetch current status of a Job.
 
@@ -67,6 +70,11 @@ Returns tuple/array with:
 - integer: number of workers running
 - integer: number of workers requested
 
+### `initParallel()`
+Initialize the current job to accept parallel workers.
+
+Returns a reference to the Julia cluster manager instance.
+
 ### `setJobScale(ctx, job, parallelism)`
 Request to scale the job up or down to the level of parallelism requested.
 
@@ -76,6 +84,9 @@ Parameters:
 
 Returns:
 - boolean: true/false indicating success/failure
+
+### `waitForWorkers(min_workers)`
+Wait for a certain number of workers to join.
 
 ### `getJobEndpoint(ctx, job)`
 Get the endpoint exposed by the job/service.

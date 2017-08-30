@@ -4,14 +4,17 @@ using Compat
 using Requests
 using HttpCommon
 using JSON
+using ClusterManagers
 
+import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, self
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self
 
 @compat abstract type JRunClientJob end
 
 const JOBTYPE_LABELS = Vector{String}()
 const JOBTYPE = Vector{Any}()
+_JuliaClusterManager = nothing
 
 as_label{T<:JRunClientJob}(::Type{T}) = String(rsplit(string(T), '.'; limit=2)[end])
 
@@ -68,6 +71,8 @@ immutable Context
         new(root, token, namespace)
     end
 end
+
+show(io::IO, ctx::Context) = print(io, "JuliaRunClient for ", ctx.namespace, " @ ", ctx.root)
 
 """
 Verifies if JuliaRun is running and is connected to a compute cluster.
@@ -187,6 +192,33 @@ function submitJob(ctx::Context, job::JRunClientJob; kwargs...)
     _type_name_query(ctx, "/submitJob/", job, query)
 end
 
+"""
+Initialize the cluster manager for parallel mode.
+"""
+function initParallel(; topology=:master_slave)
+    global _JuliaClusterManager
+    COOKIE = ENV["JRUN_CLUSTER_COOKIE"]
+    if _JuliaClusterManager === nothing
+        _JuliaClusterManager = ElasticManager(;addr=IPv4("0.0.0.0"), port=9009, cookie=COOKIE, topology=topology)
+    else
+        warn("parallel mode was already initialized")
+    end
+    _JuliaClusterManager
+end
+
+
+"""
+Wait for a certain number of workers to join.
+"""
+function waitForWorkers(min_workers)
+    info("waiting for $min_workers...")
+    t1 = time()
+    while nworkers() < min_workers
+        sleep(2)
+    end
+    info("workers started in $(time()-t1) seconds")
+end
+
 # ---------------------------------------------------
 # Utility methods
 # ---------------------------------------------------
@@ -213,8 +245,7 @@ function _simple_query(ctx, path)
     query = make_query(ctx)
     #info("requesting ", ctx.root * path)
     #info("query ", query)
-    #resp = get(ctx.root * path, query=query)
-    resp = get(ctx.root * path)
+    resp = get(ctx.root * path, query=query)
     parse_resp(resp)
 end
 
