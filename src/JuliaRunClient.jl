@@ -8,7 +8,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self, waitForWorkers
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self, waitForWorkers, @result
 
 @compat abstract type JRunClientJob end
 
@@ -217,6 +217,20 @@ function waitForWorkers(min_workers)
         sleep(2)
     end
     info("workers started in $(time()-t1) seconds")
+end
+
+macro result(req)
+    quote
+        _server_exception = nothing
+        try
+            res = $(esc(req))
+            (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
+        catch x
+            println(STDERR, "Error: ", x.reason)
+            isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
+            rethrow(x)
+        end
+    end
 end
 
 # ---------------------------------------------------
