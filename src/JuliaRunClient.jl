@@ -1,3 +1,5 @@
+__precompile__(true)
+
 module JuliaRunClient
 
 using Compat
@@ -8,8 +10,19 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, initParallel, self, waitForWorkers, @result
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result
 
+"""
+Types of Jobs:
+- JuliaParBatch
+- JuliaParBatchWorkers
+- Notebook
+- JuliaBatch
+- PkgBuilder
+- Webserver
+- MessageQ
+- Generic
+"""
 @compat abstract type JRunClientJob end
 
 const JOBTYPE_LABELS = Vector{String}()
@@ -193,6 +206,23 @@ function submitJob(ctx::Context, job::JRunClientJob; kwargs...)
 end
 
 """
+Update a job definition to execute on the cluster.
+
+Parameters:
+- job: A JRunClientJob of appropriate type
+- job specific parameters, with names as documented for the JobType constructor
+
+Returns nothing.
+"""
+function updateJob(ctx::Context, job::JRunClientJob; kwargs...)
+    query = Dict{String,String}()
+    for (k,v) in kwargs
+        query[string(k)] = string(v)
+    end
+    _type_name_query(ctx, "/updateJob/", job, query)
+end
+
+"""
 Initialize the cluster manager for parallel mode.
 """
 function initParallel(; topology=:master_slave)
@@ -270,5 +300,7 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     resp = get(ctx.root * path * jt * "/", query=query)
     parse_resp(resp)
 end
+
+include("docs.jl")
 
 end # module
