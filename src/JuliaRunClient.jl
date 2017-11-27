@@ -10,7 +10,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initialize, release
 
 """
 Types of Jobs:
@@ -299,6 +299,16 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     jt = _jobtype(job)
     resp = get(ctx.root * path * jt * "/", query=query)
     parse_resp(resp)
+end
+
+function initialize(num_workers, ctx=Context(), job=self())
+    initParallel()
+    setJobScale(ctx, job, num_workers)
+    waitForWorkers(num_workers)
+end
+
+function release(ctx=Context(), job=self())
+    setJobScale(ctx, job, 0)
 end
 
 include("docs.jl")
