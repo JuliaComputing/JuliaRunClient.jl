@@ -301,13 +301,14 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     parse_resp(resp)
 end
 
-function initialize(num_workers, ctx=Context(), job=self())
+function initializeCluster(num_workers, ctx=Context(), job=self())
     initParallel()
     setJobScale(ctx, job, num_workers)
     waitForWorkers(num_workers)
+    ctx
 end
 
-function release(ctx=Context(), job=self())
+function releaseCluster(ctx=Context(), job=self())
     setJobScale(ctx, job, 0)
 end
 
