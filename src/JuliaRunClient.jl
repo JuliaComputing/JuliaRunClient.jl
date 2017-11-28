@@ -254,7 +254,11 @@ macro result(req)
         _server_exception = nothing
         try
             res = $(esc(req))
-            (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
+            if isa(res, Dict)
+                (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
+            else
+                res
+            end
         catch x
             println(STDERR, "Error: ", x.reason)
             isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
