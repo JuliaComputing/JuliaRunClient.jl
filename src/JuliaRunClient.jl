@@ -10,7 +10,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initializeCluster, releaseCluster
 
 """
 Types of Jobs:
@@ -254,7 +254,11 @@ macro result(req)
         _server_exception = nothing
         try
             res = $(esc(req))
-            (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
+            if isa(res, Dict)
+                (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
+            else
+                res
+            end
         catch x
             println(STDERR, "Error: ", x.reason)
             isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
@@ -299,6 +303,17 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     jt = _jobtype(job)
     resp = get(ctx.root * path * jt * "/", query=query)
     parse_resp(resp)
+end
+
+function initializeCluster(num_workers, ctx=Context(), job=self())
+    initParallel()
+    setJobScale(ctx, job, num_workers)
+    waitForWorkers(num_workers)
+    ctx
+end
+
+function releaseCluster(ctx=Context(), job=self())
+    setJobScale(ctx, job, 0)
 end
 
 include("docs.jl")
