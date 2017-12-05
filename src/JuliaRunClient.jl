@@ -254,11 +254,7 @@ macro result(req)
         _server_exception = nothing
         try
             res = $(esc(req))
-            if isa(res, Dict)
-                (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
-            else
-                res
-            end
+            (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
         catch x
             println(STDERR, "Error: ", x.reason)
             isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
@@ -305,14 +301,19 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     parse_resp(resp)
 end
 
-function initializeCluster(num_workers, ctx=Context(), job=self())
+function initializeCluster(num_workers, ctx=Context())
     initParallel()
-    setJobScale(ctx, job, num_workers)
-    waitForWorkers(num_workers)
-    ctx
+    job = self()
+    res = setJobScale(ctx, job, num_workers)
+    if (res["code"] == 0) && res["data"]
+        waitForWorkers(num_workers)
+        res = Dict{String,Any}("code"=>0, "data"=>ctx)
+    end
+    res
 end
 
-function releaseCluster(ctx=Context(), job=self())
+function releaseCluster(ctx=Context())
+    job = self()
     setJobScale(ctx, job, 0)
 end
 
