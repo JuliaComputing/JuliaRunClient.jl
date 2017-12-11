@@ -229,9 +229,14 @@ function initParallel(; topology=:master_slave)
     global _JuliaClusterManager
     COOKIE = ENV["JRUN_CLUSTER_COOKIE"]
     if _JuliaClusterManager === nothing
-        _JuliaClusterManager = ElasticManager(;addr=IPv4("0.0.0.0"), port=9009, cookie=COOKIE, topology=topology)
+        try
+            _JuliaClusterManager = ElasticManager(;addr=IPv4("0.0.0.0"), port=9009, cookie=COOKIE, topology=topology)
+        catch ex
+            (isa(ex, Base.UVError) && (ex.prefix == "listen") && (ex.code == -98)) || rethrow(ex)
+            error("Parallel mode is already being used in a different Julia instance")
+        end
     else
-        warn("parallel mode was already initialized")
+        info("Parallel mode was already initialized for this Julia instance")
     end
     _JuliaClusterManager
 end
