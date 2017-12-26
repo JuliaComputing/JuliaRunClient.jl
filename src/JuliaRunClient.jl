@@ -31,6 +31,9 @@ _JuliaClusterManager = nothing
 
 as_label{T<:JRunClientJob}(::Type{T}) = String(rsplit(string(T), '.'; limit=2)[end])
 
+"""
+Returns a reference to the current job.
+"""
 function self()
     jtype = ENV["JRUN_TYPE"]
     jname = ENV["JRUN_NAME"]
