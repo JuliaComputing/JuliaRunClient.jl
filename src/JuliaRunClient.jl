@@ -10,7 +10,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initializeCluster, releaseCluster
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initializeCluster, releaseCluster, getEncodedRoute
 
 """
 Types of Jobs:
@@ -293,8 +293,8 @@ function parse_resp(resp)
     JSON.parse(String(resp.data))
 end
 
-function _simple_query(ctx, path)
-    query = make_query(ctx)
+function _simple_query(ctx, path; q=Dict())
+    query = merge(make_query(ctx), q)
     #info("requesting ", ctx.root * path)
     #info("query ", query)
     resp = get(ctx.root * path, query=query)
@@ -324,6 +324,15 @@ function releaseCluster(ctx=Context())
     job = self()
     setJobScale(ctx, job, 0)
 end
+
+immutable JBoxContext
+    ctx::Context
+
+    JBoxContext = new(Context("http://juliabox-svc.default:9999"))
+end
+
+getEncodedRoute(jctx::JBoxContext, job, port) =
+    _simple_query(jctx.ctx, "/jbox/get_encoded_route/"; q=Dict("name"=>job.name, "port"=>port))
 
 include("docs.jl")
 
