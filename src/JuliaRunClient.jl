@@ -10,7 +10,7 @@ using ClusterManagers
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
-export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initializeCluster, releaseCluster
+export getSystemStatus, listJobs, getAllJobInfo, getJobStatus, getJobScale, setJobScale, getJobEndpoint, deleteJob, tailJob, submitJob, updateJob, initParallel, self, waitForWorkers, @result, initializeCluster, releaseCluster, getEncodedURL
 
 """
 Types of Jobs:
@@ -113,6 +113,15 @@ Returns:
 - dictionary: of the form `{"jobname": { "type": "JuliaBatch", "status": [], "scale": [], "endpoint": [] }...}`
 """
 getAllJobInfo(ctx::Context) = _simple_query(ctx, "/getAllJobInfo/")
+
+"""
+Get encoded URL to job port when using router.
+
+Returns:
+- The encoded URL as a String
+"""
+getEncodedURL(ctx::Context, job, port) = _simple_query(ctx, "/getEncodedURL/";
+                                                       q = Dict("name"=>job.name, "port"=>port))
 
 """
 Fetch current status of a Job.
@@ -293,8 +302,8 @@ function parse_resp(resp)
     JSON.parse(String(resp.data))
 end
 
-function _simple_query(ctx, path)
-    query = make_query(ctx)
+function _simple_query(ctx, path; q::Dict{String,String}=Dict{String,String}())
+    query = merge(make_query(ctx), q)
     #info("requesting ", ctx.root * path)
     #info("query ", query)
     resp = get(ctx.root * path, query=query)
