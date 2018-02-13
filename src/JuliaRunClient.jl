@@ -120,7 +120,7 @@ Get encoded URL to job port when using router.
 Returns:
 - The encoded URL as a String
 """
-getEncodedURL(ctx::Context, job, port) = _type_name_query(ctx, "/getEncodedURL/", job, query = Dict("port"=>port))
+getEncodedURL(ctx::Context, job, port) = _type_name_query(ctx, "/getEncodedURL/", job, Dict("port"=>port))
 
 """
 Fetch current status of a Job.
