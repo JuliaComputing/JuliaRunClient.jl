@@ -259,8 +259,10 @@ Wait for a certain number of workers to join.
 function waitForWorkers(min_workers)
     info("waiting for $min_workers...")
     t1 = time()
-    while nworkers() < min_workers
-        sleep(2)
+    if min_workers > 0
+        while (1 in workers()) || (nworkers() < min_workers)
+            sleep(1)
+        end
     end
     info("workers started in $(time()-t1) seconds")
 end
@@ -330,7 +332,11 @@ end
 
 function releaseCluster(ctx=Context())
     job = self()
-    setJobScale(ctx, job, 0)
+    ret = setJobScale(ctx, job, 0)
+    while !(1 in workers())
+        sleep(1)
+    end
+    ret
 end
 
 include("docs.jl")
