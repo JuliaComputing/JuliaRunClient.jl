@@ -274,8 +274,12 @@ macro result(req)
             res = $(esc(req))
             (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
         catch x
-            println(STDERR, "Error: ", x.reason)
-            isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
+            if isa(x, ApiException)
+                println(STDERR, "Error: ", x.reason)
+                isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
+            elseif isa(x, Base.UVError)
+                println(STDERR, "Error: ", x.prefix, "(", x.code, ")")
+            end
             rethrow(x)
         end
     end
