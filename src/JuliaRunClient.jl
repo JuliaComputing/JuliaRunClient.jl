@@ -1,10 +1,6 @@
-__precompile__(true)
-
 module JuliaRunClient
 
-using Compat
-using Requests
-using HttpCommon
+using HTTP
 using JSON
 using ClusterManagers
 
@@ -23,13 +19,13 @@ Types of Jobs:
 - MessageQ
 - Generic
 """
-@compat abstract type JRunClientJob end
+abstract type JRunClientJob end
 
 const JOBTYPE_LABELS = Vector{String}()
 const JOBTYPE = Vector{Any}()
 _JuliaClusterManager = nothing
 
-as_label{T<:JRunClientJob}(::Type{T}) = String(rsplit(string(T), '.'; limit=2)[end])
+as_label(::Type{T}) where {T<:JRunClientJob} = String(rsplit(string(T), '.'; limit=2)[end])
 
 """
 Returns a reference to the current job.
@@ -43,7 +39,7 @@ end
 
 for T in (:JuliaParBatch, :JuliaParBatchWorkers, :Notebook, :JuliaBatch, :PkgBuilder, :Webserver, :MessageQ, :Generic)
     @eval begin
-        immutable $T <: JRunClientJob
+        struct $T <: JRunClientJob
             name::String
         end
         push!(JOBTYPE, $T)
@@ -51,14 +47,14 @@ for T in (:JuliaParBatch, :JuliaParBatchWorkers, :Notebook, :JuliaBatch, :PkgBui
     end
 end
 
-immutable ApiException <: Exception
+struct ApiException <: Exception
     status::Int
     reason::String
-    resp::Response
+    resp::HTTP.Response
 
-    function ApiException(resp::Response; reason::String="")
-        isempty(reason) && (reason = get(STATUS_CODES, statuscode(resp), reason))
-        new(statuscode(resp), reason, resp)
+    function ApiException(resp::HTTP.Response; reason::String="")
+        isempty(reason) && (reason = get(HTTP.Messages.STATUS_MESSAGES, resp.status, reason))
+        new(resp.status, reason, resp)
     end
 end
 
@@ -76,7 +72,7 @@ Default values of all parameters are set to match those inside a JuliaRun cluste
 - reads the namespace from the default secret
 - presents the namespace service token (also read from the default secret) for authentication
 """
-immutable Context
+struct Context
     root::String
     token::String
     namespace::String
@@ -247,7 +243,7 @@ function initParallel(; topology=:master_slave)
             error("Parallel mode is already being used in a different Julia instance")
         end
     else
-        info("Parallel mode was already initialized for this Julia instance")
+        @info("Parallel mode was already initialized for this Julia instance")
     end
     _JuliaClusterManager
 end
@@ -257,14 +253,14 @@ end
 Wait for a certain number of workers to join.
 """
 function waitForWorkers(min_workers)
-    info("waiting for $min_workers...")
+    @info("waiting for $min_workers...")
     t1 = time()
     if min_workers > 0
         while (1 in workers()) || (nworkers() < min_workers)
             sleep(1)
         end
     end
-    info("workers started in $(time()-t1) seconds")
+    @info("workers started in $(time()-t1) seconds")
 end
 
 macro result(req)
@@ -288,8 +284,8 @@ end
 # ---------------------------------------------------
 # Utility methods
 # ---------------------------------------------------
-_jobtype{T<:JRunClientJob}(j::T) = _jobtype(T)
-_jobtype{T}(::Type{T}) = rsplit(string(T), '.'; limit=2)[end]
+_jobtype(j::T) where {T<:JRunClientJob} = _jobtype(T)
+_jobtype(::Type{T}) where {T} = rsplit(string(T), '.'; limit=2)[end]
 
 # assuming PATH_MAX is 256
 _isfile(val) = (length(val) < 256) && isfile(val)
@@ -302,16 +298,16 @@ function make_query(ctx::Context)
 end
 
 function parse_resp(resp)
-    (200 <= statuscode(resp) <= 206) || throw(ApiException(resp))
-    #info("response ", String(resp.data))
-    JSON.parse(String(resp.data))
+    (200 <= resp.status <= 206) || throw(ApiException(resp))
+    #@info("response " * String(resp.body))
+    JSON.parse(String(resp.body))
 end
 
 function _simple_query(ctx, path; q::Dict{String,String}=Dict{String,String}())
     query = merge(make_query(ctx), q)
-    #info("requesting ", ctx.root * path)
-    #info("query ", query)
-    resp = get(ctx.root * path, query=query)
+    #@info("requesting " * ctx.root * path)
+    #@info("query " * query)
+    resp = HTTP.request("GET", HTTP.URIs.URI(ctx.root * path); query=query)
     parse_resp(resp)
 end
 
@@ -319,7 +315,7 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     query = merge(make_query(ctx), query)
     query["name"] = job.name
     jt = _jobtype(job)
-    resp = get(ctx.root * path * jt * "/", query=query)
+    resp = HTTP.request("GET", HTTP.URIs.URI(ctx.root * path * jt * "/"); query=query)
     parse_resp(resp)
 end
 
