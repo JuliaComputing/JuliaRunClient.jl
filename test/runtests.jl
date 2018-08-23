@@ -1,5 +1,6 @@
+# test just package loading as of now
 using JuliaRunClient
-using Base.Test
+#using Test
 
 # write your own tests here
-@test 1 == 2
+#@test 1 == 2
