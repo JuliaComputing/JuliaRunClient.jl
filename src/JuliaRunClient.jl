@@ -3,6 +3,9 @@ module JuliaRunClient
 using HTTP
 using JSON
 using ClusterManagers
+using Base64
+using Sockets
+using Distributed
 
 import Base: show
 export Context, JuliaParBatch, JuliaParBatchWorkers, Notebook, JuliaBatch, PkgBuilder, Webserver, MessageQ, Generic
@@ -33,7 +36,7 @@ Returns a reference to the current job.
 function self()
     jtype = ENV["JRUN_TYPE"]
     jname = ENV["JRUN_NAME"]
-    jultype = JOBTYPE[findfirst(JOBTYPE_LABELS, jtype)]
+    jultype = JOBTYPE[something(findfirst(isequal(jtype), JOBTYPE_LABELS), 0)]
     jultype(jname)
 end
 
@@ -76,10 +79,15 @@ struct Context
     root::String
     token::String
     namespace::String
+    readtimeout::Int
+    connecttimeout::Int
 
-    function Context(root::String="http://juliarunremote-svc.juliarun:80", token::String="/var/run/secrets/kubernetes.io/serviceaccount/token", namespace::String="/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-        _isfile(token) && (token = base64encode(readstring(token)))
-        _isfile(namespace) && (namespace = readstring(namespace))
+    function Context(root::String="http://juliarunremote-svc.juliarun:80",
+            token::String="/var/run/secrets/kubernetes.io/serviceaccount/token",
+            namespace::String="/var/run/secrets/kubernetes.io/serviceaccount/namespace";
+            readtimeout::Int=60, connecttimeout=60)
+        _isfile(token) && (token = base64encode(read(token, String)))
+        _isfile(namespace) && (namespace = read(namespace, String))
         new(root, token, namespace)
     end
 end
@@ -232,15 +240,15 @@ end
 """
 Initialize the cluster manager for parallel mode.
 """
-function initParallel(; topology=:master_slave)
+function initParallel(; topology=:master_worker)
     global _JuliaClusterManager
     COOKIE = ENV["JRUN_CLUSTER_COOKIE"]
     if _JuliaClusterManager === nothing
         try
             _JuliaClusterManager = ElasticManager(;addr=IPv4("0.0.0.0"), port=9009, cookie=COOKIE, topology=topology)
         catch ex
-            (isa(ex, Base.UVError) && (ex.prefix == "listen") && (ex.code == -98)) || rethrow(ex)
-            error("Parallel mode is already being used in a different Julia instance")
+            (isa(ex, Base.IOError) && (ex.code == -98)) || rethrow(ex)
+            error("Parallel mode is already being used in a different Julia instance")  # "listen: address already in use (EADDRINUSE)"
         end
     else
         @info("Parallel mode was already initialized for this Julia instance")
@@ -271,10 +279,10 @@ macro result(req)
             (res["code"] == 0) ? res["data"] : throw(ApiException(res["code"], res["data"], res))
         catch x
             if isa(x, ApiException)
-                println(STDERR, "Error: ", x.reason)
-                isempty(x.resp.data) || println(STDERR, "Caused by: ", String(x.resp.data))
-            elseif isa(x, Base.UVError)
-                println(STDERR, "Error: ", x.prefix, "(", x.code, ")")
+                println(stderr, "Error: ", x.reason)
+                isempty(x.resp.data) || println(stderr, "Caused by: ", String(x.resp.data))
+            elseif isa(x, Base.IOError)
+                println(stderr, "Error: ", x.msg, "(", x.code, ")")
             end
             rethrow(x)
         end
@@ -303,11 +311,20 @@ function parse_resp(resp)
     JSON.parse(String(resp.body))
 end
 
+function _http_opts(ctx::Context)
+    Dict(
+            :retries            => 0,
+            :readtimeout        => ctx.readtimeout,
+            :connecttimeout     => ctx.connecttimeout,
+            :status_exception   => false
+        )
+end
+
 function _simple_query(ctx, path; q::Dict{String,String}=Dict{String,String}())
     query = merge(make_query(ctx), q)
-    #@info("requesting " * ctx.root * path)
-    #@info("query " * query)
-    resp = HTTP.request("GET", HTTP.URIs.URI(ctx.root * path); query=query)
+    url = merge(HTTP.URIs.URI(ctx.root * path); query=query)
+    #@info("requesting", ctx.root, path, query, url)
+    resp = HTTP.request("GET", url; _http_opts(ctx)...)
     parse_resp(resp)
 end
 
@@ -315,7 +332,9 @@ function _type_name_query(ctx::Context, path::String, job::JRunClientJob, query:
     query = merge(make_query(ctx), query)
     query["name"] = job.name
     jt = _jobtype(job)
-    resp = HTTP.request("GET", HTTP.URIs.URI(ctx.root * path * jt * "/"); query=query)
+    url = merge(HTTP.URIs.URI(ctx.root * path * jt * "/"); query=query)
+    #@info("requesting", ctx.root, path, jt, query, url)
+    resp = HTTP.request("GET", url; _http_opts(ctx)...)
     parse_resp(resp)
 end
 
