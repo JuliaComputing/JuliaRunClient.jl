@@ -243,7 +243,7 @@ Initialize the cluster manager for parallel mode.
 function initParallel(; topology=:master_worker)
     if haskey(ENV, "JULIABOX")
         v = "$(VERSION.major).$(VERSION.minor)"
-        open(joinpath(ENV["HOME"], ".julia_master_version")) do f
+        open(joinpath(ENV["HOME"], ".julia_master_version"), "w") do f
             write(f, v)
         end
     end
