@@ -241,6 +241,13 @@ end
 Initialize the cluster manager for parallel mode.
 """
 function initParallel(; topology=:master_worker)
+    if haskey(ENV, "JULIABOX")
+        v = "$(VERSION.major).$(VERSION.minor)"
+        open(joinpath(ENV["HOME"], ".julia_master_version")) do f
+            write(f, v)
+        end
+    end
+
     global _JuliaClusterManager
     COOKIE = ENV["JRUN_CLUSTER_COOKIE"]
     if _JuliaClusterManager === nothing
