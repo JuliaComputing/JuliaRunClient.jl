@@ -287,7 +287,7 @@ macro result(req)
         catch x
             if isa(x, ApiException)
                 println(stderr, "Error: ", x.reason)
-                isempty(x.resp.data) || println(stderr, "Caused by: ", String(x.resp.data))
+                isempty(x.resp.body) || println(stderr, "Caused by: ", String(x.resp.body))
             elseif isa(x, Base.IOError)
                 println(stderr, "Error: ", x.msg, "(", x.code, ")")
             end
